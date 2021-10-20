@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+</body>
+<script>
+
+    dm = new ht.DataModel();
+    g3d = new ht.graph3d.Graph3dView(dm);
+
+    relativeLayout = new ht.ui.RelativeLayout();// 相对布局器 可对界面进行布局
+    var ht3dView = new ht.ui.HTView(g3d);// 放置 3d 组件
+    relativeLayout.addView(ht3dView, {// 给相对布局器添加组件显示，参数一为组件名称，参数二可设置宽高、对齐方式等属性
+        width: 'match_parent',
+        height: 'match_parent'
+    });
+    var listView = window.list = new ht.ui.ListView();// 列表组件
+    for (var i = 1; i <= 15; i++) {
+        var data = new ht.Data();// 创建节点
+        data.setName('楼层' + i);// 设置节点名称
+        listView.dm().add(data);// 将节点添加进列表组件中
+    }
+    relativeLayout.addView(listView, {// 将 listView 组件添加进布局器中
+        align: 'left',// 设置对齐方式为左对齐
+        vAlign: 'top',// 设置垂直对齐方式为顶部对齐
+        marginTop: 120,// 设置外边距顶部为 120 像素
+        marginLeft: 60,// 设置外边距左侧为 60 像素
+        width: 80,// 设置宽度为 80
+        height: 480,// 设置高度为 480
+        index: 100// 设置元素的堆叠顺序
+    });
+
+    relativeLayout.addToDOM();// 将组件添加进 body 中
+    var loadCity = function(){
+        ht.Default.loadObj('obj/city.obj', 'obj/city.mtl', {// 加载模型
+            center: true,// 模型是否居中，默认为false，设置为true则会移动模型位置使其内容居中
+            cube: true,// 是否将模型缩放到单位1的尺寸范围内，默认为false
+            prefix: 'obj/',// 图片路径前缀，即在map_kd值之前增加的前缀，如果是相对路径则以加载obj的html页面的路径为参考
+            shape3d: 'city',// 如果指定了shape3d名称，则HT将自动将加载解析后的所有材质模型构建成数组的方式，以该名称进行注册
+            finishFunc: function(modelMap, array, rawS3){// 用于加载 obj 模型后的回调处理
+                city.rawS3 = rawS3;// 设置变量 city 对象的 rawS3 属性 此函数中的 rawS3 属性为 obj 模型的原始大小
+                showCity();// 创建一个节点 设置节点的 shape3d 为 city 显示 city.obj 与 city.mtl 的内容
+            }
+        });
+    }
+    //列表点击
+    listView.dm().sm().ms(function(e){// 监听选中变化事件
+        if (e.kind === 'set') {// 设置监听事件
+            showFloor();// 显示楼层
+        }
+    });
+    var showFloor = function(){
+        g3d.setCenter([210, 0, 210]);// 设置 3d 组件的“中心”位置
+        dm.clear();// 清除数据容器中的所有节点
+        var rawS3 = floor.rawS3,// 获取 obj 模型的原始大小
+            node = new ht.Node();// 创建一个新的节点
+        node.s({// 设置节点的样式属性
+            'shape3d': 'floor',// 此项设置的值为 ht.Default.loadObj 中设置的 shape3d 属性的值
+            'wf.visible': 'selected',// 设置选中节点时显示节点外部的线框
+            '3d.selectable': false// 设置节点不可选中
+        });
+        node.s3(rawS3[0] / 10,rawS3[1]/ 10,rawS3[2] / 10);// 设置节点的大小为原始大小的十分之一
+        node.p3(140, 0, 230);// 设置节点的位置
+
+        dm.add(node);// 将节点添加进数据容器中
+
+        // 添加四个“相机”的节点
+        createNode([0, 20, 0]);
+        createNode([110, 20, 220]);
+        createNode([330, 20, 420]);
+        createNode([210, 20, 120]);
+        createNode([420, 20, 120]);
+
+    };
+    var node = new ht.Node();
+    node.s("shape3d", "./symbols/city.json");
+    function createNode(p3, s3){
+        var node = new ht.Node();// 创建一个新的节点
+        node.p3(p3);// 设置节点的位置
+        // node.s3(s3);
+        node.s({
+            'shape3d': 'billboard',// 设置节点的 shape3d 类型为 billboard 类型，显示为“面片”
+            'shape3d.image': './symbols/智能楼宇/camera.json',// 3d图形整体贴图
+            'shape3d.image.cache' : true,// 如果贴图是矢量，是否缓存（缓存后性能会得到提升）
+            'shape3d.autorotate': true,// 是否自动朝向相机
+            'shape3d.transparent': true,// 决定3d图形是否透明
+            // 'shape3d.alwaysOnTop': true,// 是否总是在最前
+            'shape3d.fixSizeOnScreen': [ 38, 47 ]// 是否无论缩放远近，在屏幕内呈现固定大小，值可为true（使用图片或矢量自身大小）/false, 也可以是[100, 200]（对应宽高）
+        });
+        dm.add(node);// 将节点添加进数据容器中
+
+        g3d.invalidateShape3dCachedImage(node);// cache 的代价是，这里需要更新
+        return node;
+    }
+    listView.getView().addEventListener('click', function(e){// 监听点击事件
+        e.preventDefault();// 阻止默认操作
+        if (e.clientY - 120 < 50) {
+            showCity();// 显示初始 3D 楼宇场景
+            listView.dm().sm().cs();// 列表设置清除所有选中元素
+        }
+    });
+</script>
+</html>
